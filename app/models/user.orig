@@ -1,0 +1,49 @@
+class User
+
+  include ActiveModel::Model
+
+  # Our user database has three columns
+  attr_accessor :name, :password, :display_name
+
+  def weemo_uid
+    @name
+  end
+
+  def weemo_profile
+    "premium"
+  end
+
+  def weemo_domain
+    "tsheffler.wauth9"
+  end
+
+
+  # For this little demonstration, environment.rb defines a list of users in memory
+  def self.find_by_name(name)
+    i = GLOBAL_USERS.find_index {|item| item.name == name}
+    if i
+      return GLOBAL_USERS[i]
+    else
+      return nil
+    end
+
+  end
+
+  # Our authentication scheme returns the user
+  def self.authenticate(name, password)
+    user = self.find_by_name(name)
+    if user
+      if user.password != password
+        user = nil
+      end
+    end
+    user
+  end
+    
+  # Query to get all the users
+  def self.all
+    GLOBAL_USERS
+  end
+
+end
+

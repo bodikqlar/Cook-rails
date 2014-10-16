@@ -1,0 +1,145 @@
+<h1>Call</h1>
+
+<div class="container">
+  <div class="row">
+    <div class="col-sm-4">
+      <div id="video-container" style="width:320px; height:180px; background:#0074bc; border: 1px solid black;">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="form-horizontal">
+    <div class="form-group"></div>
+    <div class="form-group">
+      <label class="col-sm-1 control-label">Friend:</label>
+      <div class="col-sm-2">
+        <%= select_tag(:friend, options_from_collection_for_select(@friends, 'rtcc_uid', 'name'), {id: "friend_select", class: "form-control"}) %>
+      </div>
+      <div class="col-sm-1">
+        <button id="call_button" disabled class="btn btn-large" onclick="call()">Call</button>
+      </div>
+    </div>
+
+    <div class="form-horizontal">
+      <div class="col-sm-4">
+        <button class="btn btn-large btn-primary btn-block" onclick="hangup()">Hangup</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+ var rtccAppId = "<%= RTCC_APP_ID %>";
+ var rtcc = null;
+ var rtccCall = null;
+
+ function initializeRtccApp(rtccAppId, token, displayName) {
+   var options = {
+     debugLevel: 11,
+     displayName: displayName,
+     container: 'video-container'
+     
+   };
+   rtcc = new Weemo(rtccAppId, token, 'internal', options);
+
+   // Get the Connection Handler callback when the JavaScript is connected to WeempoDriver
+   rtcc.onConnectionHandler = function(message, code) {
+     console.log(['onConnectionHandler', message, code]);
+     switch(message) {
+       // Authenticate
+       case 'connectedWeemoDriver':
+         rtcc.authenticate();
+         break; 
+       case 'connectedWebRTC':
+         rtcc.authenticate();
+         break; 
+       case 'sipOk':
+         $("#call_button").removeAttr("disabled");
+         break;
+       case 'sipNok':
+         break;
+       case 'loggedasotheruser':
+         rtcc.authenticate(1);
+         break;
+     }
+   }
+     
+   rtcc.onCallHandler = function(call, args) {
+     console.log(['onCallHandler', call, args]);
+     rtccCall = call;
+
+     // Handle incoming call
+     if (args.type == 'webRTCcall' && args.status == 'incoming') {
+       var ans = confirm("Accept call from '" + call.dn + "'?");
+       if (ans == true) {
+         rtccCall.accept();
+       }
+       else {
+         rtccCall.hangup();
+       }
+     }
+
+     // Handle refused call
+     if (args.status == 'terminated' && args.reason == 'rejected') {
+       alert("Call rejected");
+     }
+
+     // Handle call to UID not logged-in
+     if (args.status == 'terminated' && args.reason == 'not found') {
+       alert("User not logged in");
+     }
+   }
+
+   rtcc.onGetHandler = function(name, value) {
+     console.log(['onGetHandler', name, value]);
+   }
+
+   rtcc.onWeemoDriverNotStarted = function(downloadUrl) {
+     var answer = confirm('Click OK to download and install the RTCC Client.');
+     if (answer == true) {
+       window.location = downloadUrl;
+     }
+   };
+
+   rtcc.initialize();
+ }
+
+ function callFriend(friendUid) {
+   rtcc.createCall(friendUid, 'internal', "<%= current_user.name %>");
+ }
+
+ function call() {
+   var friendUid = $("#friend_select").val()
+   console.log(["call", friendUid]);
+   rtcc.createCall(friendUid, 'internal', "<%= current_user.name %>");
+ }
+   
+
+ function hangup() {
+   rtccCall.hangup();
+ }
+
+ function documentReady() {
+
+   $.ajax({
+     type: "POST",
+     url: "/rtcc/callback",
+     cache: false,
+     dataType: "JSON"
+   }).success(function(data) {
+     console.log(["RtccToken Success", data]);
+     var token = data.token;
+     initializeRtccApp(rtccAppId, token, "<%= current_user.name %>");
+   }).error(function(e) {
+     console.log(["RtccToken error", e]);
+   });
+ }
+
+ $(document).ready(documentReady);
+
+</script>
+
+
